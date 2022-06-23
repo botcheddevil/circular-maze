@@ -30,15 +30,19 @@ def PointsInCircum(r, n=100):
 
 
 def lineBetweenTwoLevelsAtAngle(context, levelPoints, level1, level2, angle):
-    context.set_source_rgba(0.3, 0.6, 0.9, 0.8)
+    context.new_path()
+    context.set_source_rgba(0.3, 0.6, 0.9, 0.9)
     context.set_line_width(1.5)
+    context.set_line_cap(cairo.LINE_CAP_ROUND)
+    print(levelPoints[level1][angle])
+    print(levelPoints[level2][angle])
     context.move_to(
         centerX + levelPoints[level1][angle][0], centerY + levelPoints[level1][angle][1])
     context.line_to(
         centerX + levelPoints[level2][angle][0], centerY + levelPoints[level2][angle][1])
     context.stroke()
 
-    # context.set_source_rgb(1, 0, 0)
+    # context.set_source_rgb(0, 0.7, 0.5)
     # context.set_font_size(3)
     # context.select_font_face("Arial",
     #                          cairo.FONT_SLANT_NORMAL,
@@ -61,16 +65,40 @@ def writeValueOnNode(context, levelPoints, node, value):
         centerX + levelPoints[node["level"]][node["angle"]][0], centerY + levelPoints[node["level"]][node["angle"]][1])
     context.show_text(str(value))    
 
-def arcBetweenTwoAnglesAtLevel(context, angle1, angle2, level, divisions):
+def arcBetweenTwoAnglesAtLevel(context, angle1, angle2, step, level, divisions):
+    context.new_path()
     context.set_source_rgba(0.3, 0.6, 0.9, 0.8)
     context.set_line_width(1.5)
 
+
+    if abs(angle1 - angle2) != step:
+        angle1 = max(angle1, angle2)
+    else:
+        print("applying min logic")
+        angle1 = min(angle1, angle2)
+
+    angle2 = angle1 + step
     radius = BASE_RADIUS + (LEVEL_SIZE*level)
     angle1Radians = math.radians(360*angle1/divisions)
     angle2Radians = math.radians(360*angle2/divisions)
 
+    print("Radius", radius, angle1, angle2)
+
+    context.set_line_cap(cairo.LINE_CAP_ROUND)
     context.arc(centerX, centerY, radius, angle1Radians, angle2Radians)
     context.stroke()
+
+    # context.set_source_rgb(0, 0.7, 0.5)
+    # context.set_font_size(3)
+    # context.select_font_face("Arial",
+    #                          cairo.FONT_SLANT_NORMAL,
+    #                          cairo.FONT_WEIGHT_NORMAL)
+    # context.move_to(
+    #     centerX + levelPoints[level][angle1][0], centerY + levelPoints[level][angle1][1])
+    # context.show_text(str(angle1) + "," + str(level))
+    # context.move_to(
+    #     centerX + levelPoints[level][angle2][0], centerY + levelPoints[level][angle2][1])
+    # context.show_text(str(angle2) + "," + str(level))
 
 
 def dotAtCenterOfCell(levelPoints, cell):
@@ -98,7 +126,7 @@ def dotAtCenterOfCell(levelPoints, cell):
     #             0.8, math.radians(0), math.radians(360))
     context.stroke()
 
-
+cairo.LineCap(cairo.LineCap.BUTT)
 with cairo.SVGSurface("example.svg", WIDTH, HEIGHT) as surface:
     context = cairo.Context(surface)
     levelPoints = []
@@ -159,7 +187,8 @@ with cairo.SVGSurface("example.svg", WIDTH, HEIGHT) as surface:
 
     # Find A Random Node
 
-    currentNodeId = random.randrange(0,len(G.nodes))
+    visitedList = []
+    currentNodeId = random.choice([i for i in range(1,len(G.nodes)+1) if i not in visitedList])
     currentNode = G.nodes(data=True)[currentNodeId]
     currentNode["visited"] = True;
     visited = 1
@@ -170,7 +199,7 @@ with cairo.SVGSurface("example.svg", WIDTH, HEIGHT) as surface:
         neighborNodes = [x for x in G.neighbors(currentNodeId) if not G.nodes(data=True)[x]["visited"]]
         if (len(neighborNodes) == 0):
             print("No neighbors found")
-            currentNodeId = random.randrange(1,len(G.nodes)+1)
+            currentNodeId = random.choice([i for i in range(1,len(G.nodes)+1) if i not in visitedList])
         else:
             currentNeighborNode = neighborNodes[random.randrange(0, len(neighborNodes))]
             print(currentNeighborNode)
@@ -179,16 +208,25 @@ with cairo.SVGSurface("example.svg", WIDTH, HEIGHT) as surface:
                     G.remove_edge(currentNodeId, neighborNode)
             currentNodeId = currentNeighborNode
         print(currentNodeId)
+        visitedList.append(currentNodeId)
         currentNode = G.nodes(data=True)[currentNodeId]
         if currentNode["visited"] == False:
             currentNode["visited"] = True;
             visited += 1
-            writeValueOnNode(context, levelPoints, currentNode, visited)
+            # writeValueOnNode(context, levelPoints, currentNode, visited)
 
 
-
+    idx = 0
     for edge in G.edges:
+        idx+=1
+        # if idx > 3: break
+        print(idx)
+        print(G.nodes[edge[0]])
+        print(G.nodes[edge[1]])
         if G.nodes[edge[0]]["angle"] == G.nodes[edge[1]]["angle"]:
+            print(G.nodes[edge[1]]["angle"], "Same angle", G.nodes[edge[0]]["level"], G.nodes[edge[1]]["level"])
             lineBetweenTwoLevelsAtAngle(context, levelPoints, G.nodes[edge[0]]["level"], G.nodes[edge[1]]["level"], G.nodes[edge[1]]["angle"])
-        else:
-            arcBetweenTwoAnglesAtLevel(context, G.nodes[edge[0]]["angle"], G.nodes[edge[1]]["angle"], G.nodes[edge[0]]["level"], DIVISIONS)
+        
+        if G.nodes[edge[0]]["level"] == G.nodes[edge[1]]["level"]:
+            print(G.nodes[edge[1]]["level"], "Same level", G.nodes[edge[0]]["angle"], G.nodes[edge[1]]["angle"])
+            arcBetweenTwoAnglesAtLevel(context, G.nodes[edge[0]]["angle"], G.nodes[edge[1]]["angle"], G.nodes[edge[0]]["step"], G.nodes[edge[0]]["level"], DIVISIONS)
